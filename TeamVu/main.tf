@@ -20,7 +20,7 @@ resource "aws_vpc" "teamvu" {
 resource "aws_instance" "plex" {
   ami           = var.ami_id
   instance_type = var.instance_type
-  key_name      = aws_key_pair.aws_ssh_key.key_name  # Using the key pair created above
+  key_name      = aws_key_pair.aws_ssh_key.key_name  
   subnet_id     = aws_subnet.subnet.id
 
   tags = {
