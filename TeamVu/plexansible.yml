@@ -1,0 +1,100 @@
+- hosts: ec2_instances
+  become: yes
+  gather_facts: true
+  vars:
+    ansible_ssh_private_key_file: /home/administrator/.ssh/plex
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install Docker dependencies
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+        state: present
+
+    - name: Install Docker
+      apt:
+        name: docker-ce
+        state: present  # Ensure Docker is installed
+
+    - name: Add user to the docker group
+      user:
+        name: "{{ ansible_user_id }}"
+        groups: docker
+      become: yes
+
+    - name: Restart the Docker service
+      service:
+        name: docker
+        state: restarted
+      become: yes
+
+    - name: Pull Plex Docker image
+      docker_image:
+        name: plexinc/pms-docker
+        source: pull
+        state: present
+
+    - name: Create directory for media storage
+      file:
+        path: /srv/plex
+        state: directory
+
+    - name: Run Plex container
+      docker_container:
+        name: plex_server
+        image: plexinc/pms-docker
+        restart_policy: always
+        env:
+          TZ: Your_Timezone
+        volumes:
+          - /srv/plex:/config
+          - /home/administrator/Desktop/Plex Server
+        ports:
+          - "32400:32400/tcp"
+          - "3005:3005/tcp"
+          - "8324:8324/tcp"
+          - "32469:32469/tcp"
+          - "1900:1900/udp"
+          - "32410:32410/udp"
+          - "32412:32412/udp"
+          - "32413:32413/udp"
+          - "32414:32414/udp"
+
+- hosts: plex_nginx
+  become: yes
+  gather_facts: true
+
+  tasks:
+    - name: Install NGINX
+      apt:
+        name: nginx
+        state: present
+
+    - name: Configure NGINX as Load Balancer
+      template:
+        src: nginx.conf.j2
+        dest: /etc/nginx/sites-available/default
+      notify: Restart NGINX
+
+  handlers:
+    - name: Restart NGINX
+      service:
+        name: nginx
+        state: restarted
+
